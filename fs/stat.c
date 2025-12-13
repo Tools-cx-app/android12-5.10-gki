@@ -24,6 +24,10 @@
 #include "internal.h"
 #include "mount.h"
 
+#ifdef CONFIG_HYMOFS
+#include "hymofs.h"
+#endif
+
 /**
  * generic_fillattr - Fill in the basic attributes from the inode struct
  * @inode: Inode to use as the source
@@ -96,6 +100,9 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
 					    query_flags);
 
 	generic_fillattr(inode, stat);
+#ifdef CONFIG_HYMOFS
+	hymofs_spoof_stat(path, stat);
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(vfs_getattr_nosec);
