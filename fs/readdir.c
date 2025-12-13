@@ -538,7 +538,6 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 #ifdef CONFIG_HYMOFS
 	hymofs_cleanup_readdir(&buf.hymo);
 #endif
- 	fdput_pos(f);
 	fdput_pos(f);
 	return error;
 }
