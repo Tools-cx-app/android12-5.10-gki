@@ -22,8 +22,6 @@ ifeq ($(CONFIG_BLOCK),y)
 obj-y +=	buffer.o block_dev.o direct-io.o mpage.o
 else
 obj-y +=	no-block.o
-obj-$(CONFIG_HYMOFS) += hymofs.o
-
 endif
 
 obj-$(CONFIG_PROC_FS) += proc_namespace.o
