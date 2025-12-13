@@ -23,6 +23,9 @@
 #include <linux/uaccess.h>
 
 #include <asm/unaligned.h>
+#ifdef CONFIG_HYMOFS
+#include "hymofs.h"
+#endif
 
 /*
  * Note the "unsafe_put_user() semantics: we goto a
@@ -136,6 +139,9 @@ struct old_linux_dirent {
 
 struct readdir_callback {
 	struct dir_context ctx;
+#ifdef CONFIG_HYMOFS
+	struct hymo_readdir_context hymo;
+#endif
 	struct old_linux_dirent __user * dirent;
 	int result;
 };
@@ -189,11 +195,17 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 
 	if (!f.file)
 		return -EBADF;
+#ifdef CONFIG_HYMOFS
+	hymofs_prepare_readdir(&buf.hymo, f.file);
+#endif
 
 	error = iterate_dir(f.file, &buf.ctx);
 	if (buf.result)
 		error = buf.result;
 
+#ifdef CONFIG_HYMOFS
+	hymofs_cleanup_readdir(&buf.hymo);
+#endif
 	fdput_pos(f);
 	return error;
 }
@@ -213,6 +225,9 @@ struct linux_dirent {
 
 struct getdents_callback {
 	struct dir_context ctx;
+#ifdef CONFIG_HYMOFS
+	struct hymo_readdir_context hymo;
+#endif
 	struct linux_dirent __user * current_dir;
 	int prev_reclen;
 	int count;
@@ -230,6 +245,9 @@ static int filldir(struct dir_context *ctx, const char *name, int namlen,
 		sizeof(long));
 	int prev_reclen;
 
+#ifdef CONFIG_HYMOFS
+    if (hymofs_check_filldir(&buf->hymo, name, strlen(name))) return true;
+#endif
 	buf->error = verify_dirent_name(name, namlen);
 	if (unlikely(buf->error))
 		return buf->error;
@@ -282,6 +300,20 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	f = fdget_pos(fd);
 	if (!f.file)
 		return -EBADF;
+#ifdef CONFIG_HYMOFS
+	hymofs_prepare_readdir(&buf.hymo, f.file);
+	if (f.file->f_pos >= HYMO_MAGIC_POS) {
+		void __user *dir_ptr = buf.current_dir;
+		int res = hymofs_inject_entries(&buf.hymo, &dir_ptr, &buf.count, &f.file->f_pos);
+		if (res >= 0)
+			error = count - buf.count;
+		else
+			error = res;
+		hymofs_cleanup_readdir(&buf.hymo);
+		fdput_pos(f);
+		return error;
+	}
+#endif
 
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
@@ -295,12 +327,24 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 		else
 			error = count - buf.count;
 	}
+#ifdef CONFIG_HYMOFS
+	if (error >= 0) {
+		void __user *dir_ptr = buf.current_dir;
+		int res = hymofs_inject_entries(&buf.hymo, &dir_ptr, &buf.count, &f.file->f_pos);
+		if (res > 0)
+			error = count - buf.count;
+	}
+	hymofs_cleanup_readdir(&buf.hymo);
+#endif
 	fdput_pos(f);
 	return error;
 }
 
 struct getdents_callback64 {
 	struct dir_context ctx;
+#ifdef CONFIG_HYMOFS
+	struct hymo_readdir_context hymo;
+#endif
 	struct linux_dirent64 __user * current_dir;
 	int prev_reclen;
 	int count;
@@ -317,6 +361,9 @@ static int filldir64(struct dir_context *ctx, const char *name, int namlen,
 		sizeof(u64));
 	int prev_reclen;
 
+#ifdef CONFIG_HYMOFS
+	if (hymofs_check_filldir(&buf->hymo, name, namlen)) return true;
+#endif
 	buf->error = verify_dirent_name(name, namlen);
 	if (unlikely(buf->error))
 		return buf->error;
@@ -366,6 +413,20 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
+#ifdef CONFIG_HYMOFS
+	hymofs_prepare_readdir(&buf.hymo, f.file);
+	if (f.file->f_pos >= HYMO_MAGIC_POS) {
+		void __user *dir_ptr = buf.current_dir;
+		int res = hymofs_inject_entries64(&buf.hymo, &dir_ptr, &buf.count, &f.file->f_pos);
+		if (res >= 0)
+			error = count - buf.count;
+		else
+			error = res;
+		hymofs_cleanup_readdir(&buf.hymo);
+		fdput_pos(f);
+		return error;
+	}
+#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
@@ -379,6 +440,15 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 		else
 			error = count - buf.count;
 	}
+#ifdef CONFIG_HYMOFS
+	if (error >= 0) {
+		void __user *dir_ptr = buf.current_dir;
+		int res = hymofs_inject_entries64(&buf.hymo, &dir_ptr, &buf.count, &f.file->f_pos);
+		if (res > 0)
+			error = count - buf.count;
+	}
+	hymofs_cleanup_readdir(&buf.hymo);
+#endif
 	fdput_pos(f);
 	return error;
 }
@@ -393,6 +463,9 @@ struct compat_old_linux_dirent {
 
 struct compat_readdir_callback {
 	struct dir_context ctx;
+#ifdef CONFIG_HYMOFS
+	struct hymo_readdir_context hymo;
+#endif
 	struct compat_old_linux_dirent __user *dirent;
 	int result;
 };
@@ -448,10 +521,16 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
+#ifdef CONFIG_HYMOFS
+	hymofs_prepare_readdir(&buf.hymo, f.file);
+#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (buf.result)
 		error = buf.result;
 
+#ifdef CONFIG_HYMOFS
+	hymofs_cleanup_readdir(&buf.hymo);
+#endif
 	fdput_pos(f);
 	return error;
 }
@@ -465,6 +544,9 @@ struct compat_linux_dirent {
 
 struct compat_getdents_callback {
 	struct dir_context ctx;
+#ifdef CONFIG_HYMOFS
+	struct hymo_readdir_context hymo;
+#endif
 	struct compat_linux_dirent __user *current_dir;
 	int prev_reclen;
 	int count;
@@ -482,6 +564,9 @@ static int compat_filldir(struct dir_context *ctx, const char *name, int namlen,
 		namlen + 2, sizeof(compat_long_t));
 	int prev_reclen;
 
+#ifdef CONFIG_HYMOFS
+    if (hymofs_check_filldir(&buf->hymo, name, namlen)) return true;
+#endif
 	buf->error = verify_dirent_name(name, namlen);
 	if (unlikely(buf->error))
 		return buf->error;
@@ -534,6 +619,9 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	if (!f.file)
 		return -EBADF;
 
+#ifdef CONFIG_HYMOFS
+	hymofs_prepare_readdir(&buf.hymo, f.file);
+#endif
 	error = iterate_dir(f.file, &buf.ctx);
 	if (error >= 0)
 		error = buf.error;
@@ -546,6 +634,9 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
 		else
 			error = count - buf.count;
 	}
+#ifdef CONFIG_HYMOFS
+	hymofs_cleanup_readdir(&buf.hymo);
+#endif
 	fdput_pos(f);
 	return error;
 }

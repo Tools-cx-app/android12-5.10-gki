@@ -23,6 +23,9 @@
 
 #include "internal.h"
 #include "mount.h"
+#ifdef CONFIG_HYMOFS
+#include "hymofs.h"
+#endif
 
 /**
  * generic_fillattr - Fill in the basic attributes from the inode struct
@@ -135,6 +138,9 @@ EXPORT_SYMBOL(vfs_getattr);
 
 /**
  * vfs_fstat - Get the basic attributes by file descriptor
+#ifdef CONFIG_HYMOFS
+	hymofs_spoof_stat(path, stat);
+#endif
  * @fd: The file descriptor referring to the file of interest
  * @stat: The result structure to fill in.
  *
