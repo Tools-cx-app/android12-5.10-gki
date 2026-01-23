@@ -805,21 +805,25 @@ endif
 endif
 
 ifdef CONFIG_CC_IS_CLANG
-# Hot cold split optimization
-ifeq ($(call cc-option-yn, -mllvm -hot-cold-split=true),y)
-KBUILD_CFLAGS += -mllvm -hot-cold-split=true
-endif
+# Enable hot cold split optimization
+KBUILD_CFLAGS   += -mllvm -hot-cold-split=true
 
-# MLGO optimization for register allocation advisor
+# Enable MLGO optimizations for register allocation
 ifeq ($(call cc-option-yn, -mllvm -regalloc-enable-advisor=release),y)
-KBUILD_CFLAGS += -mllvm -regalloc-enable-advisor=release
-KBUILD_LDFLAGS += -mllvm -regalloc-enable-advisor=release
+KBUILD_CFLAGS   += -mllvm -regalloc-enable-advisor=release
+KBUILD_LDFLAGS  += -mllvm -regalloc-enable-advisor=release
 endif
 
-# MLGO optimization for inliner
-ifeq ($(call cc-option-yn, -mllvm -enable-ml-inliner=release),y)
-KBUILD_CFLAGS += -mllvm -enable-ml-inliner=release
+# Enable MLGO optimizations for inliner
+ifeq ($(call cc-option-yn, -ml-inliner-model-selector=arm64-mixed),y)
+KBUILD_CFLAGS  += -mllvm -enable-ml-inliner=release
 KBUILD_LDFLAGS += -mllvm -enable-ml-inliner=release
+
+KBUILD_CFLAGS  += -mllvm -ml-inliner-model-selector=arm64-mixed
+KBUILD_LDFLAGS += -mllvm -ml-inliner-model-selector=arm64-mixed
+
+KBUILD_CFLAGS  += -mllvm -ml-inliner-skip-policy=if-caller-not-cold
+KBUILD_LDFLAGS += -mllvm -ml-inliner-skip-policy=if-caller-not-cold
 endif
 endif
 
